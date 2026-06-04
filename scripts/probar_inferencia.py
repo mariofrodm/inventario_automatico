@@ -64,38 +64,37 @@ def main():
                 print("Error: No se pudo recibir el frame de la cámara.")
                 break
 
-            h, w, _ = frame.shape
+            alto, ancho = frame.shape[:2]
 
-            # Definir la misma ROI central que en recolector_dataset.py
-            roi_w = int(w * 0.5)
-            roi_h = int(h * 0.5)
-            
-            start_x = int((w - roi_w) / 2)
-            start_y = int((h - roi_h) / 2)
-            end_x = start_x + roi_w
-            end_y = start_y + roi_h
+            # Definir la misma ROI central que en recolector_dataset.py (50% centrado)
+            x1 = int(ancho * 0.25)
+            y1 = int(alto * 0.25)
+            x2 = int(ancho * 0.75)
+            y2 = int(alto * 0.75)
+
+            # Mapear a variables existentes para compatibilidad descendente
+            start_x, start_y = x1, y1
+            end_x, end_y = x2, y2
 
             # Extraer la imagen cruda de la ROI antes de dibujar superposiciones
-            roi_raw = frame[start_y:end_y, start_x:end_x].copy()
+            roi_raw = frame[y1:y2, x1:x2].copy()
 
             # Dibujar el rectángulo verde de la ROI
-            cv2.rectangle(frame, (start_x, start_y), (end_x, end_y), (0, 255, 0), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
             # Definir una línea horizontal en el centro exacto de la ROI (eje Y) y dibujarla de azul
-            y_line = start_y + int(roi_h / 2)
-            cv2.line(frame, (start_x, y_line), (end_x, y_line), (255, 0, 0), 2)
+            centro_y = y1 + (y2 - y1) // 2
+            y_line = centro_y
+            cv2.line(frame, (x1, centro_y), (x2, centro_y), (255, 0, 0), 2)
 
             # Preprocesamiento estricto de la ROI para el modelo
-            # a) Convertir a escala de grises
-            gray = cv2.cvtColor(roi_raw, cv2.COLOR_BGR2GRAY)
-            # b) Aplicar filtro Gaussiano con kernel (5, 5)
-            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-            # c) Redimensionar exactamente a 128x128 píxeles
+            # a) Aplicar filtro Gaussiano con kernel (5, 5) directamente sobre la ROI a color
+            blurred = cv2.GaussianBlur(roi_raw, (5, 5), 0)
+            # b) Redimensionar exactamente a 128x128 píxeles
             resized = cv2.resize(blurred, (128, 128))
             
-            # Normalizar dividiendo por 255.0, convertir a float32 y hacer reshape a (1, 128, 128, 1)
-            normalized = resized.astype(np.float32) / 255.0
-            input_tensor = normalized.reshape(1, 128, 128, 1)
+            # Convertir a float32 sin normalizar (ya que el modelo tiene una capa interna Rescaling) y hacer reshape a (1, 128, 128, 3)
+            input_tensor = resized.astype(np.float32).reshape(1, 128, 128, 3)
 
             # Inyectar el tensor al intérprete
             interpreter.set_tensor(input_details[0]['index'], input_tensor)
