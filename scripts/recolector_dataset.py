@@ -7,6 +7,7 @@ def main():
     # 1. Configurar argparse para requerir el argumento --clase
     parser = argparse.ArgumentParser(description="Herramienta de recolección de imágenes para el dataset.")
     parser.add_argument('--clase', required=True, help="Nombre de la clase de producto a recolectar.")
+    parser.add_argument('--camara', type=int, default=0, help='Índice de la cámara')
     args = parser.parse_args()
     clase = args.clase
 
@@ -16,14 +17,12 @@ def main():
     os.makedirs(raw_dir, exist_ok=True)
     os.makedirs(processed_dir, exist_ok=True)
 
-    # 3. Iniciar cv2.VideoCapture(0) (con fallback a 1)
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Advertencia: No se pudo abrir la cámara en el dispositivo 0. Intentando con el dispositivo 1...")
-        cap = cv2.VideoCapture(1)
+    # 3. Iniciar la captura de video
+    print(f"Iniciando cámara en el índice: {args.camara}")
+    cap = cv2.VideoCapture(args.camara)
 
     if not cap.isOpened():
-        print("Error: No se pudo abrir la cámara en los dispositivos 0 ni 1.")
+        print(f"Error: No se pudo abrir la cámara en el índice {args.camara}.")
         return
 
     # Forzar la resolución a 640x480 si el hardware lo permite
@@ -90,14 +89,12 @@ def main():
                 cv2.imwrite(path_raw, roi_raw)
 
                 # Procesar la ROI extraída:
-                # a) Convertir a escala de grises
-                gray = cv2.cvtColor(roi_raw, cv2.COLOR_BGR2GRAY)
-                # b) Aplicar filtro Gaussiano con kernel (5, 5)
-                blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-                # c) Redimensionar exactamente a 128x128 píxeles
+                # a) Aplicar filtro Gaussiano con kernel (5, 5) directamente sobre la ROI a color
+                blurred = cv2.GaussianBlur(roi_raw, (5, 5), 0)
+                # b) Redimensionar exactamente a 128x128 píxeles
                 processed = cv2.resize(blurred, (128, 128))
 
-                # Guardar la ROI procesada
+                # Guardar la ROI procesada (en color)
                 path_processed = os.path.join(processed_dir, nombre_archivo)
                 cv2.imwrite(path_processed, processed)
 

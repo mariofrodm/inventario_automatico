@@ -24,7 +24,7 @@ def main():
             validation_split=0.2,
             subset="both",
             seed=123,
-            color_mode="grayscale",
+            color_mode="rgb",
             image_size=(128, 128),
             batch_size=32
         )
@@ -52,8 +52,13 @@ def main():
     # 6. Construir la arquitectura de la CNN
     print("Construyendo la arquitectura de la CNN...")
     model = models.Sequential([
-        # Capa de re-escalado (0-255 a 0-1)
-        layers.Rescaling(1./255, input_shape=(128, 128, 1)),
+        # Capa de re-escalado (0-255 a 0-1) con 3 canales (RGB)
+        layers.Rescaling(1./255, input_shape=(128, 128, 3)),
+        
+        # Bloque de Data Augmentation para invariancia rotacional y espacial
+        layers.RandomRotation(1.0),
+        layers.RandomZoom(0.2),
+        layers.RandomTranslation(0.1, 0.1),
         
         # Bloque 1
         layers.Conv2D(32, (3, 3), activation='relu'),

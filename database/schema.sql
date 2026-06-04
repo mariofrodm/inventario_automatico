@@ -5,6 +5,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS Producto (
     id_producto INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT UNIQUE NOT NULL,
+    nombre_visible TEXT,
     descripcion TEXT,
     activo INTEGER DEFAULT 1,
     fecha_creacion TEXT NOT NULL
