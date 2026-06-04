@@ -1,9 +1,15 @@
 import argparse
 import json
 import os
+import sys
 import numpy as np
 import cv2
 import tensorflow as tf
+
+# Añadir la raíz del proyecto al sys.path para permitir importaciones absolutas
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from app.models.database import DatabaseManager
 
 def main():
     # Configurar argparse para seleccionar el dispositivo de cámara
@@ -36,6 +42,21 @@ def main():
     # Obtener detalles de entrada y salida del modelo
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
+
+    # Inicializar DatabaseManager y cargar mapeo de lotes activos en memoria
+    print("Conectando con la base de datos y cargando mapeo de lotes...")
+    db = DatabaseManager()
+    productos = db.get_productos()
+    mapeo_lotes = {}
+    for p in productos:
+        id_prod = p['id_producto']
+        nombre = p['nombre']
+        id_lote = db.get_lote_activo(id_prod)
+        mapeo_lotes[nombre] = {
+            'id_prod': id_prod,
+            'id_lote': id_lote
+        }
+    print(f"Mapeo de lotes cargado en memoria: {mapeo_lotes}")
 
     # 3. Iniciar la captura de video
     print(f"Iniciando cámara en el índice: {args.camara}")
@@ -105,7 +126,8 @@ def main():
 
             # Encontrar la clase con mayor probabilidad y confianza
             class_idx = np.argmax(output_data[0])
-            confianza = output_data[0][class_idx]
+            confianza_max = output_data[0][class_idx]
+            confianza = confianza_max
             clase_detectada = class_names[class_idx]
 
             # Lógica de toma de decisiones basada en el umbral de confianza (> 0.85)
@@ -132,6 +154,22 @@ def main():
                 elif estado_cruce == 1 and cooldown == 0:
                     conteo_clases[clase_detectada] += 1
                     print(f"[CRUCE] {clase_detectada} detectada. Total: {conteo_clases[clase_detectada]}")
+                    
+                    # Registrar detección en la base de datos
+                    if clase_detectada in mapeo_lotes:
+                        info_lote = mapeo_lotes[clase_detectada]
+                        id_prod = info_lote['id_prod']
+                        id_lote = info_lote['id_lote']
+                        try:
+                            db.registrar_deteccion(
+                                id_prod, 
+                                id_lote, 
+                                float(confianza_max), 
+                                f"Camara_{args.camara}"
+                            )
+                        except Exception as db_err:
+                            print(f"Error al registrar la detección en SQLite: {db_err}")
+                    
                     estado_cruce = 2
                     cooldown = 15
             else:
